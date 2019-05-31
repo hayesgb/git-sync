@@ -91,13 +91,6 @@ def sync_repo(repo, dest, branch, rev):
     Assumes `dest` has already been cloned.
     """
 
-    target_dir = os.path.join(os.curdir, dest)
-    files = [f for f in target_dir if os.path.isfile(f)]
-    if len(files) > 0:
-        if not '.git' in files:
-            for f in files:
-                os.remove(f)
-
     # fetch branch
     output = sh(['git', 'fetch', 'origin', branch], cwd=dest)
     click.echo('Fetched {branch}: {output}'.format(**locals()))
