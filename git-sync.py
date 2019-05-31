@@ -32,6 +32,19 @@ def get_repo_at(dest):
 
     return current_remote.lower(), current_branch.lower()
 
+def clear_folder(dir):
+    if os.path.exists(dir):
+        for the_file in os.listdir(dir):
+            file_path = os.path.join(dir, the_file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                else:
+                    clear_folder(file_path)
+                    os.rmdir(file_path)
+            except Exception as e:
+                print(e)
+
 def setup_repo(repo, dest, branch):
     """
     Clones `branch` of remote `repo` to `dest`, if it doesn't exist already.
@@ -43,6 +56,10 @@ def setup_repo(repo, dest, branch):
 
     # if no git repo exists at dest, clone the requested repo
     if not os.path.exists(os.path.join(dest, '.git')):
+        # If the directory exists, but is not a git repo, make sure its empty before we try to clone
+        dirs_and_files = os.listdir(os.path.join(dest))
+        if len(dirs_and_files) > 0:
+            clear_folder(dirs_and_files)
         output = sh(
             ['git', 'clone', '--no-checkout', '-b', branch, repo, dest])
         click.echo('Cloned ...{repo_name}'.format(**locals()))
