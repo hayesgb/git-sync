@@ -5,7 +5,7 @@ import click
 import datetime
 import os
 import shlex
-import subprocess
+import subprocessw
 import sys
 import time
 # try to be py2/3 compatible
@@ -18,20 +18,6 @@ def sh(*args, **kwargs):
     """ Get subprocess output"""
     return subprocess.check_output(*args, **kwargs).decode().strip()
 
-def get_repo_at(dest):
-    if not os.path.exists(os.path.join(dest, '.git')):
-        raise ValueError('No repo found at {dest}'.format(**locals))
-
-    current_remote = sh(
-        shlex.split('git config --get remote.origin.url'),
-        cwd=dest)
-
-    current_branch = sh(
-            shlex.split('git rev-parse --abbrev-ref HEAD'),
-            cwd=dest)
-
-    return current_remote.lower(), current_branch.lower()
-
 def clear_folder(dir):
     if os.path.exists(dir):
         for the_file in os.listdir(dir):
@@ -43,7 +29,25 @@ def clear_folder(dir):
                     clear_folder(file_path)
                     os.rmdir(file_path)
             except Exception as e:
-                print(e)
+                raise ValueError("Failed to clear folder for:  {}".format(e))
+
+def get_repo_at(dest, repo, branch):
+    if not os.path.exists(os.path.join(dest, '.git')):
+        raise ValueError('No repo found at {dest}'.format(**locals))
+
+    current_remote = sh(
+        shlex.split('git config --get remote.origin.url'),
+        cwd=dest)
+    try:
+        current_branch = sh(
+                shlex.split('git rev-parse --abbrev-ref HEAD'),
+                cwd=dest)
+    except subprocess.CalledProcessError:
+        clear_folder(dest)
+        setup_repo(repo, dest, branch)
+
+    return current_remote.lower(), current_branch.lower()
+
 
 def setup_repo(repo, dest, branch):
     """
@@ -54,52 +58,55 @@ def setup_repo(repo, dest, branch):
 
     repo_name = urlparse(repo).path
 
+    try:
     # if no git repo exists at dest, clone the requested repo
-    if not os.path.exists(os.path.join(dest, '.git')):
-        # If the directory exists, but is not a git repo, make sure its empty before we try to clone
-        dirs_and_files = os.listdir(os.path.join(dest))
-        if len(dirs_and_files) > 0:
-            clear_folder(dirs_and_files)
-        output = sh(
-            ['git', 'clone', '--no-checkout', '-b', branch, repo, dest])
-        click.echo('Cloned ...{repo_name}'.format(**locals()))
+        if not os.path.exists(os.path.join(dest, '.git')):
+            if not (len(os.listdir(dest)) = 0):
+                clear_folder(dest)
+            output = sh(
+                ['git', 'clone', '--no-checkout', '-b', branch, repo, dest])
+            click.echo('Cloned ...{repo_name}'.format(**locals()))
 
-    else:
-        # if there is a repo, make sure it's the right one
-        current_remote, current_branch = get_repo_at(dest)
-        repo = repo.lower()
-        if not repo.endswith('.git'):
-            repo += '.git'
-        if not current_remote.endswith('.git'):
-            current_remote += '.git'
-        parsed_remote = urlparse(current_remote)
-        parsed_repo = urlparse(repo)
+        else:
+            # if there is a repo, make sure it's the right one
+            current_remote, current_branch = get_repo_at(dest, repo, branch)
+            repo = repo.lower()
+            if not repo.endswith('.git'):
+                repo += '.git'
+            if not current_remote.endswith('.git'):
+                current_remote += '.git'
+            parsed_remote = urlparse(current_remote)
+            parsed_repo = urlparse(repo)
 
-        if (    parsed_repo.netloc != parsed_remote.netloc
-                or parsed_repo.path != parsed_remote.path):
-            raise ValueError(
-                'Requested repo `...{repo_name}` but destination already '
-                'has a remote repo cloned: {current_remote}'.format(**locals()))
+            if (    parsed_repo.netloc != parsed_remote.netloc
+                    or parsed_repo.path != parsed_remote.path):
+                raise ValueError(
+                    'Requested repo `...{repo_name}` but destination already '
+                    'has a remote repo cloned: {current_remote}'.format(**locals()))
 
-        # and check that the branches match as well
-        if branch.lower() != current_branch:
-            raise ValueError(
-                'Requested branch `{branch}` but destination is '
-                'already on branch `{current_branch}`'.format(**locals()))
+            # and check that the branches match as well
+            if branch.lower() != current_branch:
+                raise ValueError(
+                    'Requested branch `{branch}` but destination is '
+                    'already on branch `{current_branch}`'.format(**locals()))
 
-        # and check that we aren't going to overwrite any changes!
-        # modified_status: uncommited modifications
-        # ahead_status: commited but not pushed
-        modified_status = sh(shlex.split('git status -s'), cwd=dest)
-        ahead_status = sh(shlex.split('git status -sb'), cwd=dest)[3:]
-        if modified_status:
-            raise ValueError(
-                'There are uncommitted changes at {dest} that syncing '
-                'would overwrite'.format(**locals()))
-        if '[ahead ' in ahead_status:
-            raise ValueError(
-                'This branch is ahead of the requested repo and syncing would '
-                'overwrite the changes: {ahead_status}'.format(**locals()))
+            # and check that we aren't going to overwrite any changes!
+            # modified_status: uncommited modifications
+            # ahead_status: commited but not pushed
+            modified_status = sh(shlex.split('git status -s'), cwd=dest)
+            ahead_status = sh(shlex.split('git status -sb'), cwd=dest)[3:]
+            if modified_status:
+                raise ValueError(
+                    'There are uncommitted changes at {dest} that syncing '
+                    'would overwrite'.format(**locals()))
+            if '[ahead ' in ahead_status:
+                raise ValueError(
+                    'This branch is ahead of the requested repo and syncing would '
+                    'overwrite the changes: {ahead_status}'.format(**locals()))
+
+    except subprocess.CalledProcessError:
+        clear_folder(dest)
+        setup_repo(repo, dest, branch)
 
 
 def sync_repo(repo, dest, branch, rev):
