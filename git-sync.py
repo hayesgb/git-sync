@@ -33,6 +33,9 @@ def get_repo_at(dest):
     return current_remote.lower(), current_branch.lower()
 
 def clear_folder(dir):
+    """ Empties the folder so git-sync can be run cleanly """
+
+    # Remove them recursively
     if os.path.exists(dir):
         for the_file in os.listdir(dir):
             file_path = os.path.join(dir, the_file)
@@ -57,9 +60,7 @@ def setup_repo(repo, dest, branch):
     # if no git repo exists at dest, clone the requested repo
     if not os.path.exists(os.path.join(dest, '.git')):
         # If the directory exists, but is not a git repo, make sure its empty before we try to clone
-        dirs_and_files = os.listdir(os.path.join(dest))
-        if len(dirs_and_files) > 0:
-            clear_folder(dirs_and_files)
+
         output = sh(
             ['git', 'clone', '--no-checkout', '-b', branch, repo, dest])
         click.echo('Cloned ...{repo_name}'.format(**locals()))
@@ -145,6 +146,10 @@ def git_sync(repo, dest, branch, rev, wait, run_once, debug):
     if not debug:
         sys.excepthook = (
             lambda etype, e, tb : print("{}: {}".format(etype.__name__, e)))
+
+    # The target directory must be empty prior to starting
+    # the git-sync loop
+    clear_folder(dest)
 
     # infer repo/branch
     if not repo and not branch:
