@@ -8,6 +8,9 @@ import shlex
 import subprocess
 import sys
 import time
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 # try to be py2/3 compatible
 try:
      from urllib.parse import urlparse
@@ -31,22 +34,6 @@ def get_repo_at(dest):
             cwd=dest)
 
     return current_remote.lower(), current_branch.lower()
-
-def clear_folder(dir):
-    """ Empties the folder so git-sync can be run cleanly """
-
-    # Remove them recursively
-    if os.path.exists(dir):
-        for the_file in os.listdir(dir):
-            file_path = os.path.join(dir, the_file)
-            try:
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-                else:
-                    clear_folder(file_path)
-                    os.rmdir(file_path)
-            except Exception as e:
-                print(e)
 
 def setup_repo(repo, dest, branch):
     """
@@ -147,9 +134,9 @@ def git_sync(repo, dest, branch, rev, wait, run_once, debug):
         sys.excepthook = (
             lambda etype, e, tb : print("{}: {}".format(etype.__name__, e)))
 
-    # The target directory must be empty prior to starting
-    # the git-sync loop
-    clear_folder(dest)
+    # If the target directory is a git repo, reinitialize it.
+    if os.path.exists(dest):
+        sh(['git', 'init'], cwd=dest)
 
     # infer repo/branch
     if not repo and not branch:
