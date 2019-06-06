@@ -136,7 +136,8 @@ def git_sync(repo, dest, branch, rev, wait, run_once, debug):
 
     # If the target directory is a git repo, reinitialize it.
     if os.path.exists(dest):
-        sh(['git', 'init'], cwd=dest)
+        sh(['git', 'fetch'], cwd=dest)
+        sh(['git', 'reset', '--hard', 'origin/master'], cwd=dest)
 
     # infer repo/branch
     if not repo and not branch:
